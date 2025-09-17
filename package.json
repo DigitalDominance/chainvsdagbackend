@@ -11,7 +11,8 @@
     "axios": "^1.12.2",
     "express": "^5.1.0",
     "kaspa-wasm": "^0.13.0",
-    "ws": "^8.18.3"
+    "ws": "^8.18.3",
+    "websocket": "^1.0.35"
   },
   "devDependencies": {
     "nodemon": "^2.0.16"
