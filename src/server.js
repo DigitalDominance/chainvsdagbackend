@@ -1,72 +1,41 @@
-// src/server.js
-const express = require("express");
-const http = require("http");
-const { WebSocketServer } = require("ws");
-
-const routes = require("./routes/index");
-const subscribeBlock = require("./services/wasm_rpc");
+const express = require('express');
+const bodyParser = require('body-parser');
+const routes = require('./routes/index');
+const http = require('http'); // Import http module
+const subscribeBlock = require('./services/wasm_rpc');
+const WebSocket = require('ws');
 
 const app = express();
+// ✅ Heroku sets process.env.PORT, fallback to 3000 locally
+const PORT = process.env.PORT || 3000;
 
-// Built-in body parsing (no need for body-parser)
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
-
-// Optional health + root routes
-app.get("/health", (_req, res) => res.status(200).send("OK"));
-app.use("/", routes);
-
-// Create ONE HTTP server so WS and HTTP share the same port
+// Create an HTTP server
 const server = http.createServer(app);
 
-// Attach WebSocket server on a fixed path
-const wss = new WebSocketServer({ server, path: "/ws" });
+// Create a WebSocket server and attach it to the HTTP server
+const wss = new WebSocket.Server({ server });
 
-// --- WebSocket keepalive (important on Heroku/proxies) ---
-function heartbeat() { this.isAlive = true; }
+app.use(bodyParser.json());
+app.use(bodyParser.urlencoded({ extended: true }));
 
-wss.on("connection", (ws, req) => {
-  ws.isAlive = true;
-  ws.on("pong", heartbeat);
+// Mount routes (make sure ./routes/index exports a Router)
+app.use('/', routes);
 
-  const ip =
-    req.headers["x-forwarded-for"]?.split(",")[0]?.trim() ||
-    req.socket.remoteAddress;
-  console.log("WS connected", { ip });
+// Handle WebSocket connections
+wss.on('connection', (ws) => {
+  console.log('New WebSocket connection established');
 
-  // Greet the client
-  ws.send(JSON.stringify({ type: "hello", msg: "Connected to Kaspa WS" }));
-
-  ws.on("message", (data) => {
-    // Handle your protocol here
-    let parsed = data;
-    try { parsed = JSON.parse(data); } catch {}
-    console.log("WS message:", parsed);
-    // Example echo:
-    ws.send(JSON.stringify({ type: "echo", data: parsed }));
+  ws.on('message', (message) => {
+    console.log('Received message from client:', message);
   });
 
-  ws.on("close", () => {
-    console.log("WS closed", { ip });
+  ws.on('close', () => {
+    console.log('WebSocket connection closed');
   });
 });
 
-// Terminate stale sockets; ping to keep connections alive
-const pingInterval = setInterval(() => {
-  wss.clients.forEach((ws) => {
-    if (ws.isAlive === false) return ws.terminate();
-    ws.isAlive = false;
-    ws.ping();
-  });
-}, 30000);
-
-wss.on("close", () => clearInterval(pingInterval));
-
-// Heroku will set PORT
-const PORT = process.env.PORT || 3005;
-
+// Start the server
 server.listen(PORT, () => {
-  console.log(`HTTP+WS server listening on ${PORT}`);
-  // Start your kaspa-wasm subscription loop, pass the WS server
-  subscribeBlock(wss);
+  console.log(`Server is running on port ${PORT}`);
+  subscribeBlock(wss); // Pass the WebSocket server to subscribeBlock
 });
