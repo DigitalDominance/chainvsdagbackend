@@ -6,8 +6,7 @@ const subscribeBlock = require('./services/wasm_rpc');
 const WebSocket = require('ws');
 
 const app = express();
-// ✅ Heroku sets process.env.PORT, fallback to 3000 locally
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 3005;
 
 // Create an HTTP server
 const server = http.createServer(app);
@@ -17,9 +16,6 @@ const wss = new WebSocket.Server({ server });
 
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
-
-// Mount routes (make sure ./routes/index exports a Router)
-app.use('/', routes);
 
 // Handle WebSocket connections
 wss.on('connection', (ws) => {
